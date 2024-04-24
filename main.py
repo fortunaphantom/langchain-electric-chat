@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from langchain_community.document_loaders import WebBaseLoader
+from langchain_community.document_loaders import Docx2txtLoader
 import bs4
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -19,14 +19,7 @@ start_time = time.time()
 llm = ChatOpenAI(model="gpt-3.5-turbo-0125")
 
 # Load, chunk and index the contents of the blog.
-loader = WebBaseLoader(
-    web_paths=("https://lilianweng.github.io/posts/2023-06-23-agent/",),
-    bs_kwargs=dict(
-        parse_only=bs4.SoupStrainer(
-            class_=("post-content", "post-title", "post-header")
-        )
-    ),
-)
+loader = Docx2txtLoader("data/List of Data Processing Systems Architecture quest.docx")
 docs = loader.load()
 
 print(time.time() - start_time)
@@ -43,19 +36,20 @@ vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings
 print(time.time() - start_time)
 start_time = time.time()
 
-# # Retrieve and generate using the relevant snippets of the blog.
-# retriever = vectorstore.as_retriever()
-# prompt = hub.pull("rlm/rag-prompt")
+# Retrieve and generate using the relevant snippets of the blog.
+retriever = vectorstore.as_retriever()
+prompt = hub.pull("rlm/rag-prompt")
 
-# def format_docs(docs):
-#     return "\n\n".join(doc.page_content for doc in docs)
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
 
 
-# rag_chain = (
-#     {"context": retriever | format_docs, "question": RunnablePassthrough()}
-#     | prompt
-#     | llm
-#     | StrOutputParser()
-# )
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
 
-# rag_chain.invoke("What is Task Decomposition?")
+for chunk in rag_chain.stream("What is system analytics?"):
+    print(chunk, end="", flush=True)
